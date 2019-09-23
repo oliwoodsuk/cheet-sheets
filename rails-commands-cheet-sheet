@@ -1,0 +1,642 @@
+#Create a new rails app
+rails new blog
+
+cd blog
+
+#Create generic controller, model, view and relationships
+bin/rails generate scaffold Post title:string
+
+#update database
+bin/rails db:migrate
+
+----------
+
+#Add a. New attribute/collumn to the model db
+rails generate migration add_name_to_modelname name:string
+bin/rails db:migrate
+
+----------
+
+#Adding a new route in /routes.rb
+get '/pages', to: 'pages#index'
+
+# added a site.com/pages route which calls the Pages controller's Index action
+
+#creates a new controller, remember caps for first letter and pluralise
+bin/rails generate controller Pages
+#or if we want to pre-add some actions i.e. index (in this case)
+Bin/rails generate controller Pages index
+
+#Add to pages controller;
+  def index
+    @pages = Page.all
+  end
+
+#Now the last thing for the site.com/pages to work is an index.html.erb file in the views/pages directory
+
+#To create a model for our new Page controller/route, we run the below;
+bin/rails generate model Page title:string body:text slug:string
+
+bin/rails db:migrate
+
+#If you want to add some pages, you can open the rails terminal and add new instances to the model by using variables. E.g:
+page = Page.new
+page.title = "hello there"
+page.slug = "about"
+page.save
+page2 = Page.new
+etc
+
+
+
+#To start displaying page attributes, we need to change the index.html.erb to call ruby instances, e.g;
+<p><%= @pages.first.title %></p>
+
+#To display links to pages(resource name in this case) in an iterative argument:
+<% @pages.each do |page| %>
+	<p><%= link_to page.title, "/pages/#{page.id}"%></p>
+<% end %>
+
+#The above won't work yet as we need to change the /config/routes.rb file. Add:
+
+  get '/pages/:id', to: 'pages#show', as: 'page'
+
+#The above has created a rails helper which can be called with page_path(page) or just page in the index.html.erb i.e.
+
+link_to page.title.capitalize, page%>
+
+#Add a show argument to the Page's controller like the below:
+  def show
+    @page = Page.find(params[:id])
+  end
+
+#Now create a view for this show method, create a show.html.erb file in the views/pages directory
+#Put the following code into that file:
+
+<h1><%= @page.title %></h1>
+<p>
+	<%= @page.body %>
+</p>
+
+
+####Setting up routes for new pages, 
+
+#add the below line to routes.rb
+  get '/pages/new', to: 'pages#new'
+#GET request, when /pages/new is loaded, routed to the pages controllers's new action
+#We also need to make sure the above line is high enough in the routes.rb file that 'new' doesn't get treated as a :id by the index method.
+
+#Now add a new action to the pages controller:
+def new
+	@page = Page.new
+end
+
+#now create a view file for the new action called new.html.erb in the views/pages directory. Then add the below codes snippet to Call the form_for command in an iterative way through the @page instance variable whilst applying the 'field' div classes CSS styling.
+
+<%= form_for(@page) do |f| %>
+
+	<div class="field">
+		<%= f.label :title %>
+		<%= f.text_field :title %>
+	</div>
+	
+	<div class="field">
+		<%= f.label :body %>
+		<%= f.text_area :body %>
+	</div>
+	
+	<div class="field">
+		<%= f.label :slug %>
+		<%= f.text_field :slug %>
+	</div>
+	
+	<div>
+		<%= f.submit %>
+	</div>
+	
+<% end %>
+
+#Go back to routes.rb and add: ,as: 'page' to the end of the pages#new line
+get '/pages/new', to: 'pages#new', as 'new_page'
+
+#Now we can update the index view so it has a link to creating a new page
+<p> <%= link_to 'Create a new page', new_page_path %>
+
+#we'll get an error if we submit form as there isn't a post path setup, so add the below to routes.rb
+post '/pages', to: 'pages#create'
+
+#Now in the pages controller, let's add a create method, with the parameters we permit users to affect.
+
+def create
+    page_params = params.require(:page).permit(:title, :body, :slug)
+    @page = Page.new(page_params)
+    @page.save
+    redirect_to @page
+  end
+
+#####Enabling users to edit pages
+
+#First add a path to a controller's edit action in routes.rb (the 'edit_page' can be used as shorthand when linking)
+get '/pages/:id/edit', to: 'pages#edit', as: 'edit_page' 
+
+#Add an edit action to the pages controller
+def edit
+    @page = Page.find(params[:id])
+  end
+
+#Now create a edit.html.erb file so there is a linked up view
+
+#Now add a link to the edit function from the show.html.erb view, so when a page is being looked at, there is a link to the edit route
+<%= link_to 'Edit', edit_page_path(@page) %>
+
+#If we add the same form_for code from the new.html.erb view, it will autofill with the details from that pages :id.
+#We should do this through a partial, as both new.html.erb and edit.html.erb are now using the same code. Create a partial file: _form.html.erb and input
+
+<%= form_for(page) do |f| %>
+
+	<div class="field">
+		<%= f.label :title %>
+		<%= f.text_field :title %>
+	</div>
+	
+	<div class="field">
+		<%= f.label :body %>
+		<%= f.text_area :body %>
+	</div>
+	
+	<div class="field">
+		<%= f.label :slug %>
+		<%= f.text_field :slug %>
+	</div>
+	
+	<div>
+		<%= f.submit %>
+	</div>
+	
+<% end %>
+
+#Now, from any view we can render that form, and pass a object through the (page) local variable like below: (instance variable, passed to the forms variable)
+<%= render 'form', page: @page %>
+
+#Once the user has been through the edit process, to commit the changes they will have to access a PATCH route. Add below to routes.rb:
+  patch '/pages/:id', to: 'pages#update'
+
+#Now lets create the update action in the pages controller.
+  def update
+    @page = Page.find(params[:id])
+    page_params = params.require(:page).permit(:title, :body, :slug)
+    @page.update(page_params)
+    redirect_to @page
+  end
+
+#We can create a object in the controller for page-params with the code needed, seeing as we're calling it in multiple actions.
+
+  private
+  
+    def page_params
+      params.require(:page).permit(:title, :body, :slug)
+    end 
+
+#Now whenever we write page_params in another action, the above code will be called.
+#Notice how we write private? Everything below that statement can only be seen by us, the admin
+
+
+####Adding a way for users to destroy an entry/page etc
+
+#First add a route to routes.rb
+  delete '/pages/:id', to: 'pages#destroy'
+
+#Then add a destroy action to the pages controller
+  def destroy
+    @page = Page.find(params[:id])
+    @page.destroy
+    redirect_to pages_path
+  private
+
+#Now add a link to the action in the show view
+<%= link_to 'Delete', @page, method: :delete %>
+
+
+####This below routes.rb file:
+Rails.application.routes.draw do
+  get '/', to: 'pages#index'
+  get '/pages/new', to: 'pages#new', as: 'new_page'
+  post '/pages', to: 'pages#create'
+  get '/pages', to: 'pages#index'
+  get '/pages/:id', to: 'pages#show', as: 'page'
+  get '/pages/:id/edit', to: 'pages#edit', as: 'edit_page'
+  patch '/pages/:id', to: 'pages#update'
+  delete '/pages/:id', to: 'pages#destroy'
+  
+####....Could be simplified to:
+
+Rails.application.routes.draw do
+  resources :pages
+
+#If we want to see all of the routes and in the same format as above, you can run bin/routes from the terminal with working directory set to the master.
+
+#### To clean up the routes.rb file, we could make an action for the @page = Page.find(params[:id]) line and then call it via a before_action line, with exceptions for all the actions that don't need it.
+
+#At the top
+  before_action :set_page, only: [:show, :edit, :update, :destroy]
+
+#At the bottom, after private
+    def set_page
+      @page = Page.find(params[:id])
+    end
+
+####### Ruby Gems ############
+
+#All hosted at
+https://rubygems.org/
+#Type topics into search bar to search gems
+
+#Or browse categories at https://www.ruby-toolbox.com/
+
+#List all gems installed in current directories app
+gem list
+
+#Go to ruby gems.org and select a gem, then find it's documentation in the links.
+
+#To use a gem, once installed, include this line in a .rb file
+require "gem_name"
+
+#Then you can probably create variable objects with it etc
+random_variable_name = Gem_name.new("adssdfds")
+
+#Update a gem to latest version
+gem update gem_name
+
+#uninstall a gem
+gem uninstall money
+
+#Shows locations of gems
+gem environment
+
+#Find load path, go into irb shell, then run a command
+irb
+Puts $LOAD_PATH
+
+#look at a gems contents
+gem content gem_name
+
+#From the above, we find the locations of all the files to do with the money gem. We can now open them all to inspect
+
+######Active record associations#####
+
+#Once you've created a new model which will have a link to an existing model, add this line to the models/existingmodel.rb
+
+x
+
+#note the plural and lowercase
+
+#because the column we're trying to link to is in another db, it's called a foreign key. So run this command from terminal
+bin/rails g migration AddPostToComments post_id:integer:index
+
+#important to add the :index on the end for speed's sake, then run:
+bin/rails db:migrate
+
+#Now from the console we can add a comment instance with a linked post_id, doing:
+post = Post.last
+comment = post.comments.build
+comment.content = "comment on last post"
+comment.save
+
+#Or we could create a new comment without a variable and quicker by:
+post = Post.last
+post.comments.create(content: "cool", name: "Eliza")
+
+#Now, if we want to make things work more fluently, we need to add the following to the comments models/comment.rb file:
+
+belongs_to :post
+
+#Now we can call the post that a comment belongs to from a comment object.
+comment = Comment.last
+comment.post
+
+##another way to add a foreign key column to a db
+
+#we can rollback the last migration with:
+bin/rails db:rollback
+
+#then destroy the last migration file with:
+bin/rails destroy migration AddPostToComments
+
+#Notice how the above migration is in camel case even though the file name is not
+
+######Best way to create a new model with a foreign key reference column
+Once, you've added belongs_to :post and has_many :comment do:
+
+
+#The below, creates a Comment model with a content and name column, but also a reference column to the Post db with post:references. Although this column will actually be called post_id
+
+bin/rails g model Comment content:text name:string post:references
+
+
+#####How to add a foreign key column referencing another db to an exciting db.
+
+#Now add a new migration
+bin/rails generate migration AddPostToComments post:references
+
+#We can check the migration file to see the foreign key migration between post and comment that rails has created, then run
+bin/rails db:migrate
+
+#check on console with
+Post.first.comments.create(content: "Hi", name: "Jay")
+#then see with
+pp Post.first.comments
+
+#How to search in console
+post = Post.find_by(title: "console test")
+
+######Roll back migrations
+#First run:
+ls db/migrate
+
+#then you can work out how many time to run db:rollback until the stage you want
+
+
+######Has and Belongs to Many Associations
+#TO create a jointable db which list relationships between two other db's we can:
+
+bin/rails g migration CreateJoinTableUsersForums Users Forums
+
+#To speed up db lookups, go into the new migration file created and uncomment the two index lines before running db:migrate
+
+#Then go to the models/user.rb file and add this nested statement
+	has_and_belongs_to_many :forums
+
+#Then go to the models/forum.rb file and add this nested statement
+	has_and_belongs_to_many :users
+
+#Adding a user-relationship to a db through the console
+user = User.find_by(name: "oli")
+user.forums << Forum.find_by(name: "iOS")
+
+#Then to check
+pp user.forums
+
+#Looking up all users belonging to the ruby forum. AKA listing all relationships from one db to a specific field in the other db
+
+pp Forum.find_by(name: "Ruby").users
+
+#To directly lookup all associations, we have to do an SQL query from the console
+
+pp ActiveRecord::Base.connection.execute "select * from forums_users"
+
+
+#####Has Many Through Associations
+#This is like a join table but is actually it's own model, and has id's for each association as well as the ids of each of the db's it's associated with, and the possibility of additional collumns
+#from the terminal run:
+
+bin/rails g model Subscription months:integer subscriber_id:integer magazine_id:integer
+
+#Now we need to add statements to all of the involved model files
+
+#First go to the model/subscriptions.rb (the new has-mamy-through model) and add the nested statements:
+
+	belongs_to :subscriber
+	belongs_to :magazines
+
+#Now go to the model/subscriber.rb file and add nested statements:
+
+	has_many :subscriptions
+	has_many :magazines, through: :subscriptions
+
+#Now go to the model/magazine.rb file and add nested statements:
+
+	has_many :subscriptions
+	has_many :subscribers, through: :subscriptions
+
+#Then migrate with rails db:migrate
+
+#Now to add to the subscriptions of a subscriber we can run the following:
+
+subscription = Subscription.create(months: 12, magazine: Magazine.find_by(title: "Hello Magazine"))
+Subscriber.find_by(name: "jay").subscriptions << subscription
+
+
+#A way to add a record with one line without a variable
+
+Subscriber.find_by(name: "Jay").magazines << Magazine.find_by(title: "iOS Mag")
+
+#To update the months attribute of the above record:
+
+Subscriber.find_by(name: "Jay").subscriptions.last.update(months: 6)
+
+#########Creating a 'Has One' association. Basically a model/db to keep less used columns for another specific db. 
+
+bin/rails g model Profile owner:references twitter:string Github:string
+
+#Now run db:migrate and then go to the new model/Profile.rb file and add this nested line
+	has_one :profile
+
+#Now if we open the console and create a Owner object, it should have a Profile class we can call. You can do the following:
+
+owner = Owner.find_by(name: "oli")
+owner.create_profile(twitter: "ojw", Github: "olijwoods")
+owner.profile
+
+#Notice how entering just 'owner' returns just the database row for the owner db, and entering owner.profile will just return the row in the profile db linked to that object.
+
+
+########Rendering associated models in view
+
+#We could add this to to the posts/view/show.html.erb:
+
+<div id="comments">
+	<h5>Comments</h5>
+	<% @post.comments.each do |comment|%>
+	<div>
+		<p><strong><%= comment.name %> says: </strong>
+		<%= comment.content %>
+		</p>
+	</div>
+	<%end%>
+</div>
+
+#as comments are nested to posts, each post instance has a comments collection linked to it, so @post.comments will call this collection. We then call each instance of that comment collection and display it's name, then later it's content key
+
+#Using partials to show associated models
+
+#Instead of the previous point, we can use a partial. So if you create a new directory in views called 'comments' then create a file called '_comment.html.erb', then paste this code in it:
+
+<div id="comments">
+	<h5>Comments</h5>
+	<% @post.comments.each do |comment|%>
+	<div>
+		<p><strong><%= comment.name %> says: </strong>
+		<%= comment.content %>
+		</p>
+		<div class="comment-admin">
+			<%= link_to "Edit", edit_post_comment_path(@post, comment)%>
+		</div>
+	</div>
+	<%end%>
+</div>
+
+
+
+#then go to the posts/show.html.erb and paste the following code in it:
+
+<%= render partial: "comments/comment" %>
+
+#This will render the _comment file from the comments directory.
+
+#####Nested routes and resources
+
+#Instead of repeating /posts/comments/:id etc.. for each line of routes.rb, we can just nest the comments lines under the posts lines and then add the word 'do' i.e.
+
+resources: posts do
+	resources: comments
+end
+
+#or
+
+resources :posts do
+    get '/comments', to: 'comments#index', as: 'comments'
+    post '/comments/new', to: 'comments#new', as: 'new_comments'
+    patch '/comments/:id/edit', to: 'comments#edit', as: 'edit_comments'
+end
+
+#Setting up adding a comment from the browser for users
+
+#Add the following to the views/posts/show.html.erb
+
+<%= render partial: "comments/form", locals: {comments: @post.comments.new}%>
+
+#Now create the _form.html.erb file in the view/comments directory and add:
+
+<%= form_for [@post, comment] do |f| %>
+	<div class = "field"> 
+		<%= f.label :name %>
+		<%= f.text_field :name %>
+	</div>
+	<div class = "field"> 
+		<%= f.label :content, "Comment" %>
+		<%= f.text_area :content %>
+	</div>
+	
+	<div class= "actions">
+		<%= f.submit %>
+	</div>
+<% end %>
+
+#Now create a comments controller
+
+bin/rails g controller Comments
+
+#Now go into the comments controller and add the correct method and params methods:
+
+  before_action :set_post
+  
+  def create
+    @comment = @post.comments.create(comment_params)
+    redirect_to @post
+  end
+  
+  def edit
+    @comment = Comment.find(params[:id])
+  end
+  
+  def update
+    @comment = Comment.find(params[:id])
+    @comment.update(comment_params)
+    redirect_to @post
+  end
+  
+  private
+  
+  def comment_params
+    params.require(:comment).permit(:name, :content)
+  end
+  
+  def set_post
+    @post = Post.find(params[:post_id])
+  end
+  
+end
+
+#Now create a edit.html.erb view in view/comments, then add:
+
+<h1> Edit Comment </h1>
+
+<%= render partial: "form", locals: {comment: @comment} %>
+
+
+######## Polymorphic
+
+#Polymorphic belongs_to associations allow a model to belong to more than one type of other model. You could have: pp Documentary.first.actors and Movie.first.actors, where actors is drawing from the same model.
+
+#As an example you could run:
+
+rails new imdb
+bin/rails g scaffold Movie title:string duration:integer 
+bin/rails g scaffold Show title:string episode:integer
+bin/rails g scaffold Actor name:string
+
+bin/rails g migration AddProductToActor Production_id:integer production_type:string
+bin/rails db:migrate
+
+#Now add the below nested line to the model/movie.rb and the model/show.rb files
+
+has_many :actors, as: :production
+
+#Now we'll add to the model/actor.rb file:
+
+belongs_to :production, polymorphic: true 
+
+#Now we can open the terminal and run:
+
+show = Show.create(title: "Game of Thrones")
+show.actors.create(name: "Peter Dinklage")
+show.actors.create(name: "Lena Headey")
+
+#We can now run:
+
+pp Show.first.actors
+
+#We can also do it with the name of the polymorphic model i.e. production:
+
+pp Actor.first.production
+
+#Destroy polymorphic model records - You will have to change the model/file.rb line to the below and then go delete via console:
+
+has_many :actors, as: :production, dependent: :destroy
+
+#######Some more association methods
+#from the console
+
+#Check id there are any associations.
+Post.last.comments.empty?
+#or
+Post.last.comments.present?
+
+#One way to use the above is in a Boolean statement in a view file, so if there are no comments, then the comments header doesn't get shown
+
+<% if @post.comments.present? %>
+	<h1> Comments </h1>
+<% end %>
+
+#How to get the number of associations
+
+Post.first.comments.size
+#This would return the amount of associated comment records to the post in question
+
+#A statement which only shows associated records which fit the crteria you pick
+
+Post.first.comments.where(name: "Alena")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
